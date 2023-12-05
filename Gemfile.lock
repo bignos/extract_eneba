@@ -18,9 +18,16 @@ GEM
     nokogiri (1.14.4-x86_64-linux)
       racc (~> 1.4)
     racc (1.6.2)
+    rexml (3.2.6)
+    rubyzip (2.3.2)
+    selenium-webdriver (4.15.0)
+      rexml (~> 3.2, >= 3.2.5)
+      rubyzip (>= 1.2.2, < 3.0)
+      websocket (~> 1.0)
     sqlite3 (1.6.2-x86_64-linux)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
+    websocket (1.2.10)
 
 PLATFORMS
   x86_64-linux
@@ -28,6 +35,7 @@ PLATFORMS
 DEPENDENCIES
   activerecord
   nokogiri
+  selenium-webdriver
   sqlite3
 
 BUNDLED WITH

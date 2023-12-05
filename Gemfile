@@ -1,4 +1,4 @@
 source 'https://rubygems.org'
-gem 'nokogiri'
+gem 'selenium-webdriver'
 gem 'activerecord'
 gem 'sqlite3'

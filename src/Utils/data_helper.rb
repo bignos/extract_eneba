@@ -62,7 +62,8 @@ class DataHelper
     def actual_price_for_id(id)
       tmp_game = nil
       records = Game.includes(:snapshots).where(id: id).order('snapshots.price')
-      records.where(snapshots: { snap_date: more_recent_snap_date }).each do |record|
+      actual_snapshots = records.where(snapshots: { snap_date: more_recent_snap_date })
+      actual_snapshots.each do |record|
         puts "#{record.id} #{record.name} [#{record.region}] : #{record.snapshots.first.price}"
         tmp_game = Game4display.new(record.id, record.name, record.region, record.snapshots.first.price)
       end
@@ -111,6 +112,7 @@ class DataHelper
       end
     end
 
+    # Display only games with best price
     def actual_best_price
       records = Game.includes(:snapshots).where.not(snapshots: { price: 0.0 }).order('snapshots.price')
       more_recent_snap_date_var = more_recent_snap_date

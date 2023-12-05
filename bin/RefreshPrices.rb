@@ -1,7 +1,7 @@
 #! /usr/bin/env ruby
 # frozen_string_literal: true
 
-require_relative 'Utils/data_helper'
+require_relative '../src/Utils/data_helper'
 
 file_to_read = ARGV[0]
 
@@ -13,6 +13,7 @@ File.readlines(file_to_read).each do |line|
     id = match[1]
     game = DataHelper.actual_price_for_id(id)
     result = if game.nil?
+               puts("[WARNING] NO REFRESH PRICE FOR #{id}")
                line
              else
                "| #{game.id} | #{game.name.gsub(/\|/,

@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require 'nokogiri'
-require 'open-uri'
+require 'selenium-webdriver'
 
 # Extracting Games from Eneba
 class RemoteExtract
@@ -15,23 +14,17 @@ class RemoteExtract
 
   # Constructor
   def initialize
+    @scraper = init_scraper
     @game_list = []
     @number_of_pages = 1
   end
 
-  # Extract Game list from an Eneba page
-  #
-  # @param page [Integer] The page index to extract
-  #
-  # @return [Array<Game>] The game list
-  def games_from_page(page)
-    url         = format(ENEBA_URL_PATTERN, page)
-    content     = Nokogiri::HTML(URI.parse(url).open)
-    name_list   = games_name(content)
-    region_list = games_region(content)
-    price_list  = games_price(content)
+  # Return the web scraper instance(Selenium)
+  def init_scraper
+    options = Selenium::WebDriver::Chrome::Options.new
+    options.add_argument('--headless')
 
-    merge_name_price(name_list, region_list, price_list)
+    Selenium::WebDriver.for(:chrome, options: options)
   end
 
   # Extract all games from all pages
@@ -51,6 +44,20 @@ class RemoteExtract
     end
   end
 
+  # Extract Game list from an Eneba page
+  #
+  # @param page [Integer] The page index to extract
+  #
+  # @return [Array<Game>] The game list
+  def games_from_page(page)
+    url = format(ENEBA_URL_PATTERN, page)
+    @scraper.get(url)
+    @scraper.execute_script('window.scrollBy(200,1000)')
+    sleep(2)
+
+    extract_game_list_from_scraper
+  end
+
   # Print @game_list in markdown array format
   def print_markdown
     puts('| Game | Platform | Region | Price |')
@@ -66,67 +73,63 @@ class RemoteExtract
   #
   # @return [Integer] Total number of pages
   def init_number_of_pages
-    url     = format(ENEBA_URL_PATTERN, 1)
-    content = Nokogiri::HTML(URI.parse(url).open)
+    url = format(ENEBA_URL_PATTERN, 1)
+    @scraper.get(url)
 
     # Extract the total number of result
-    total_result = content.css('span.qOhwsO').text
+    total_result = @scraper.find_element(class: 'qOhwsO').text
 
     (total_result.to_f / 20.0).ceil
   end
 
-  # Extract all game's name from html_content
+  # Extract the game list from @scraper(The HTML page content)
   #
-  # @param html_content [Nokogiri::HTML4::Document] The HTML content of the page you want to extract
-  #
-  # @return [Array<String>] The list of all game's name present on html_content
-  def games_name(html_content)
-    name_list = []
-    # CSS class for Title of the game "YLosEL"
-    html_content.css('span.YLosEL').each do |game_name|
-      name_list << game_name.content
+  # @return [Array of Game] The game list from the actual @scraper page
+  def extract_game_list_from_scraper
+    page_game_list = []
+
+    complete_game_elements = @scraper.find_elements(class: 'pFaGHa')
+    complete_game_elements.each do |element|
+      name, platform = extract_name_and_platform_from_element(element)
+      price = extract_price_from_element(element)
+      region = extract_region_from_element(element)
+
+      page_game_list << Game.new(name, platform, region, price)
     end
 
-    name_list
+    page_game_list
   end
 
-  # Extract all game's price from html_content
+  # Extract the game name and platform from HTML element
   #
-  # @param html_content [Nokogiri::HTML4::Document] The HTML content of the page you want to extract
+  # @param element [Selenium::WebDriver::Element] the HTML element containing the information to be extracted
   #
-  # @return [Array<String>] The list of all game's price present on html_content
-  def games_price(html_content)
-    price_list = []
+  # @return [String, String] The game name and the game platform
+  def extract_name_and_platform_from_element(element)
+    fetch_name_and_platform(element.find_element(xpath: './/span[@class=\'YLosEL\']').text)
+  end
 
-    html_content.css('span.L5ErLT').each do |game_price|
-      price_list << game_price.content.gsub(/€(.*)/, '\1€')
+  # Extract the game price from HTML element
+  #
+  # @param element [Selenium::WebDriver::Element] the HTML element containing the information to be extracted
+  #
+  # @return [String] The game price
+  def extract_price_from_element(element)
+    begin
+      price = element.find_element(xpath: './/span[@class=\'L5ErLT\']').text.gsub(/€(.*)/, '\1€')
+    rescue Selenium::WebDriver::Error::NoSuchElementError
+      price = nil
     end
-
-    price_list
+    fetch_price(price)
   end
 
-  # Extract all game's region from html_content
+  # Extract the game region from HTML element
   #
-  # @param html_content [Nokogiri::HTML4::Document] The HTML content of the page you want to extract
+  # @param element [Selenium::WebDriver::Element] the HTML element containing the information to be extracted
   #
-  # @return [Array<String>] The list of all game's region present on html_content
-  def games_region(html_content)
-    region_list = []
-
-    html_content.css('div.Pm6lW1').each do |game_region|
-      region_list << game_region.content
-    end
-
-    region_list
-  end
-
-  # Clean the raw price, if the price is empty return 'Sold Out'
-  #
-  # @param raw_price [String] The extracted price
-  #
-  # @return [String] the price or 'Sold Out'
-  def fetch_price(raw_price)
-    raw_price.nil? ? 'Sold Out' : raw_price
+  # @return [String] The game region
+  def extract_region_from_element(element)
+    element.find_element(xpath: './/div[@class=\'Pm6lW1\']').text
   end
 
   # Extract name and platform from the raw_name
@@ -150,20 +153,12 @@ class RemoteExtract
     [name, platform]
   end
 
-  # Merge game's name and price
+  # Clean the raw price, if the price is empty return 'Sold Out'
   #
-  # @param name_list [Array of String] The game's name list
-  # @param region_list [Array of String] The game's region list
-  # @param price_list [Array of String] The game's price list
+  # @param raw_price [String] The extracted price
   #
-  # @return [Array<Game>] A Game list structure
-  def merge_name_price(name_list, region_list, price_list)
-    page_game_list = []
-    name_list.each_with_index do |name, index|
-      price = fetch_price(price_list[index])
-      name_clean, platform = fetch_name_and_platform(name)
-      page_game_list << Game.new(name_clean, platform, region_list[index], price)
-    end
-    page_game_list
+  # @return [String] the price or 'Sold Out'
+  def fetch_price(raw_price)
+    raw_price.nil? ? 'Sold Out' : raw_price
   end
 end
