@@ -32,13 +32,7 @@ class DataHelper
     #
     # @return [DateTime] The more recent snapshot date
     def more_recent_snap_date
-      more_recent_snap_date_var = nil
-      Snapshot.all.each do |snapshot|
-        if more_recent_snap_date_var.nil? || snapshot.snap_date > more_recent_snap_date_var
-          more_recent_snap_date_var = snapshot.snap_date
-        end
-      end
-      more_recent_snap_date_var
+      Snapshot.maximum(:snap_date)
     end
 
     # Search for the actual price on a specific game
@@ -60,14 +54,14 @@ class DataHelper
     #
     # @return [Game4display] The game object corresponding to the id
     def actual_price_for_id(id)
-      tmp_game = nil
-      records = Game.includes(:snapshots).where(id: id).order('snapshots.price')
-      actual_snapshots = records.where(snapshots: { snap_date: more_recent_snap_date })
-      actual_snapshots.each do |record|
-        puts "#{record.id} #{record.name} [#{record.region}] : #{record.snapshots.first.price}"
-        tmp_game = Game4display.new(record.id, record.name, record.region, record.snapshots.first.price)
-      end
-      tmp_game
+      record = Game.includes(:snapshots).where(id: id, snapshots: { snap_date: more_recent_snap_date }).first
+      display_record(record)
+      Game4display.new(record.id, record.name, record.region, record.snapshots.first.price)
+    end
+
+    # Print on STDOUT the record [id, name, region, actual_price]
+    def display_record(record)
+      puts "#{record.id} #{record.name} [#{record.region}] : #{record.snapshots.first.price}"
     end
 
     # Return the actual game price
