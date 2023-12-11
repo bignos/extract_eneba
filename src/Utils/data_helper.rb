@@ -55,6 +55,8 @@ class DataHelper
     # @return [Game4display] The game object corresponding to the id
     def actual_price_for_id(id)
       record = Game.includes(:snapshots).where(id: id, snapshots: { snap_date: more_recent_snap_date }).first
+      return nil if record.nil?
+
       display_record(record)
       Game4display.new(record.id, record.name, record.region, record.snapshots.first.price)
     end
