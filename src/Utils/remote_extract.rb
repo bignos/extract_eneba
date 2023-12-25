@@ -4,7 +4,6 @@ require 'selenium-webdriver'
 
 # Extracting Games from Eneba
 class RemoteExtract
-  # ENEBA_URL_PATTERN = 'https://www.eneba.com/store/xbox-games?drms[]=xbox&page=%d&regions[]=argentina&regions[]=latam&regions[]=turkey&types[]=game'
   ENEBA_URL_PATTERN = 'https://www.eneba.com/store/xbox-games?drms[]=xbox&page=%d&regions[]=argentina&regions[]=latam&regions[]=turkey&sortBy=ALPHABETICALLY_ASC&types[]=game'
 
   Game = Struct.new('Game', :name, :platform, :region, :price)
@@ -16,7 +15,6 @@ class RemoteExtract
   def initialize
     @scraper = init_scraper
     @game_list = []
-    @number_of_pages = 1
   end
 
   # Return the web scraper instance(Selenium)
@@ -32,9 +30,9 @@ class RemoteExtract
   #
   # @note Long Process Execution
   def all_games
-    @number_of_pages = init_number_of_pages
-    (1..@number_of_pages).each do |page|
-      loading_percentage = (page.to_f / @number_of_pages) * 100.0
+    number_of_pages = init_number_of_pages
+    (1..number_of_pages).each do |page|
+      loading_percentage = (page.to_f / number_of_pages) * 100.0
       warn(format('Page: %<page>d Percentage: %<percentage>.2f%%', page: page, percentage: loading_percentage))
       page_game_list = games_from_page(page)
       redo if page_game_list.empty?
@@ -47,11 +45,13 @@ class RemoteExtract
   # Extract Game list from an Eneba page
   #
   # @param page [Integer] The page index to extract
+  # @param max_attempt [Integer] The maximum number of attempts to get the page
+  # @param attempt_delay [Integer] The delay between attempts in seconds
   #
   # @return [Array<Game>] The game list
-  def games_from_page(page)
+  def games_from_page(page, max_attempt = 5, attempt_delay = 30)
     url = format(ENEBA_URL_PATTERN, page)
-    @scraper.get(url)
+    get_url_content_from_scraper(url, max_attempt, attempt_delay)
     @scraper.execute_script('window.scrollBy(200,1000)')
     sleep(2)
 
@@ -98,6 +98,31 @@ class RemoteExtract
     end
 
     page_game_list
+  end
+
+  # Get the page content from @scraper
+  #
+  # @param url [String] The url to get the content
+  # @param max_attempt [Integer] The maximum number of attempts
+  # @param attempt_delay [Integer] The delay between attempts
+  def get_url_content_from_scraper(url, max_attempt = 5, attempt_delay = 30)
+    attempt = 0
+    while attempt < max_attempt
+      begin
+        @scraper.get(url)
+        break
+      rescue Net::ReadTimeout
+        display_readtimeout_error(max_attempt, attempt_delay)
+        attempt += 1
+      end
+    end
+  end
+
+  # Display ReadTimeout error and sleep attempt_delay seconds
+  #
+  # @param attempt_delay [Integer] The delay between attempts
+  def display_readtimeout_error(attempt_delay)
+    puts("Net::ReadTimeout. Retrying in #{attempt_delay} seconds") && sleep(attempt_delay)
   end
 
   # Extract the game name and platform from HTML element

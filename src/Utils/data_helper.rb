@@ -102,7 +102,7 @@ class DataHelper
     def new_games
       more_recent_snap_date_var = more_recent_snap_date
       Game.includes(:snapshots).find_each do |game|
-        if Snapshot.where(game_id: game.id).count == 1 && (game.snapshots.first.snap_date = more_recent_snap_date_var)
+        if Snapshot.where(game_id: game.id).count == 1 && (game.snapshots.first.snap_date == more_recent_snap_date_var)
           puts "#{game.name} [#{game.region}] : #{game.snapshots.first.price}"
         end
       end
