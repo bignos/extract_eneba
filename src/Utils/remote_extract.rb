@@ -77,7 +77,8 @@ class RemoteExtract
     @scraper.get(url)
 
     # Extract the total number of result
-    total_result = @scraper.find_element(class: 'qOhwsO').text
+    scaper_element = @scraper.find_element(:class, 'qOhwsO')
+    total_result = scaper_element.property('innerHTML')
 
     (total_result.to_f / 20.0).ceil
   end
@@ -112,7 +113,7 @@ class RemoteExtract
         @scraper.get(url)
         break
       rescue Net::ReadTimeout
-        display_readtimeout_error(max_attempt, attempt_delay)
+        display_readtimeout_error(attempt_delay)
         attempt += 1
       end
     end
